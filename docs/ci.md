@@ -17,10 +17,7 @@ This document provides detailed information about all GitHub Actions workflows i
   - [Code Quality Workflows](#code-quality-workflows)
     - [pre-commit](#pre-commit)
   - [Project Management Workflows](#project-management-workflows)
-    - [Issue Manager](#issue-manager)
-    - [Labels](#labels)
-    - [Latest Changes](#latest-changes)
-    - [Add to Project](#add-to-project)
+    - [PR Labels](#pr-labels)
     - [Conflict Detector](#conflict-detector)
   - [Workflow Dependencies](#workflow-dependencies)
   - [Secrets Configuration](#secrets-configuration)
@@ -33,6 +30,7 @@ This document provides detailed information about all GitHub Actions workflows i
   - [Troubleshooting](#troubleshooting)
     - [Pre-commit Failures](#pre-commit-failures)
     - [Playwright Test Failures](#playwright-test-failures)
+    - [PR Title Validation Failures](#pr-title-validation-failures)
     - [Deployment Failures](#deployment-failures)
     - [Insufficient Coverage](#insufficient-coverage)
 
@@ -43,6 +41,8 @@ This document provides detailed information about all GitHub Actions workflows i
 ### Deploy to Staging
 
 **File**: `.github/workflows/deploy-staging.yml`
+
+**Status**: ⚠️ Temporarily Disabled
 
 **Triggers**:
 - When code is pushed to the `master` branch
@@ -74,6 +74,8 @@ Automatically deploys the application to the staging environment. This workflow 
 ### Deploy to Production
 
 **File**: `.github/workflows/deploy-production.yml`
+
+**Status**: ⚠️ Temporarily Disabled
 
 **Triggers**:
 - When a GitHub Release is published (`types: published`)
@@ -164,7 +166,7 @@ Runs end-to-end (E2E) tests using the Playwright testing framework. Tests are ex
 - Supports manual trigger via workflow_dispatch with tmate debugging session
 
 **Quality Assurance**:
-- Uses `alls-green-playwright` job for branch protection checks
+- Uses `playwright-alls-green` job for branch protection checks
 
 ---
 
@@ -267,131 +269,56 @@ Automatically runs code formatting and linting checks, and commits fixes when ne
 
 ## Project Management Workflows
 
-### Issue Manager
+### PR Labels
 
-**File**: `.github/workflows/issue-manager.yml`
-
-**Triggers**:
-- Scheduled: Daily at 17:21 UTC
-- Issue comment created
-- Issue labeled
-- Pull Request labeled
-- Manual trigger
-
-**Description**:
-Automatically manages the lifecycle of Issues and Pull Requests, closing or reminding based on labels and activity status.
-
-**Only Runs in Main Repository**:
-- `if: github.repository_owner == 'fastapi'`
-
-**Management Rules**:
-
-1. **answered label**:
-   - Delay: 10 days (864000 seconds)
-   - Message: Assuming the original need was handled, automatically closes
-
-2. **waiting label**:
-   - Delay: 30.4 days (2628000 seconds)
-   - Reminder: 3 days before closing
-   - Message: Waiting for original user response timeout, automatically closes
-
-3. **invalid label**:
-   - Delay: Immediate (0 seconds)
-   - Message: Marked as invalid, closes immediately
-
-4. **maybe-ai label**:
-   - Delay: Immediate (0 seconds)
-   - Message: Marked as potentially AI-generated, closes immediately
-
-**Permissions Required**:
-- `issues: write`
-- `pull-requests: write`
-
----
-
-### Labels
-
-**File**: `.github/workflows/labeler.yml`
+**File**: `.github/workflows/pr-labels.yml`
 
 **Triggers**:
-- Pull Request opened, synchronized, or reopened
-- Pull Request label added or removed
+- Pull Request opened, synchronized, reopened, or edited
 
 **Description**:
-Automatically adds labels to Pull Requests and validates that PRs have at least one required label.
+Validates that Pull Request titles follow the [Conventional Commits](https://www.conventionalcommits.org/) specification and automatically adds labels based on commit types.
 
 **Main Steps**:
+1. Validate PR title format against conventional commit pattern
+2. Automatically add labels based on task type (feat, fix, docs, etc.)
+3. Add scope labels if specified in PR title
 
-1. **labeler job**: Auto-add labels
-   - Automatically adds appropriate labels based on file change paths
-   - Only runs on non-label operations
+**Supported Task Types**:
+- `feat` → `feature` label - New features
+- `fix` → `bug` label - Bug fixes
+- `docs` → `docs` label - Documentation changes
+- `test` → `test` label - Test updates
+- `ci` → `internal` label - CI/CD changes
+- `refactor` → `refactor` label - Code refactoring
+- `perf` → `performance` label - Performance improvements
+- `chore` → `internal` label - Maintenance tasks
+- `revert` → `revert` label - Revert changes
+- `build` → `internal` label - Build system changes
+- `style` → `internal` label - Code style changes
 
-2. **check-labels job**: Validate labels
-   - Ensures PR has at least one of the following labels:
-     - `breaking` - Breaking changes
-     - `security` - Security related
-     - `feature` - New feature
-     - `bug` - Bug fix
-     - `refactor` - Refactoring
-     - `upgrade` - Dependency upgrade
-     - `docs` - Documentation
-     - `lang-all` - Multi-language
-     - `internal` - Internal changes
+**PR Title Format**:
+- Basic: `<type>: <description>`
+- With scope: `<type>(<scope>): <description>`
+- Breaking change: `<type>!: <description>` (adds `breaking change` label)
+
+**Examples**:
+- ✅ `feat: add user authentication`
+- ✅ `fix(api): resolve timeout issue`
+- ✅ `docs: update installation guide`
+- ✅ `feat!: redesign API endpoints` (breaking change)
+
+**Features**:
+- Automatic label assignment based on commit type
+- Scope label support (e.g., `scope:api` for `fix(api): message`)
+- Breaking change detection with `!` marker
+
+**Action Used**:
+- `ytanikin/pr-conventional-commits@1.5.1`
 
 **Permissions Required**:
 - `contents: read`
 - `pull-requests: write`
-
----
-
-### Latest Changes
-
-**File**: `.github/workflows/latest-changes.yml`
-
-**Triggers**:
-- Pull Request merged to `master` branch and closed
-- Manual trigger (can specify PR number)
-
-**Description**:
-Automatically updates the `release-notes.md` file, adding merged PR information to release notes.
-
-**Main Steps**:
-1. Checkout code (using special token to allow commits)
-2. Run latest-changes action
-3. Automatically commit updated release-notes.md
-
-**Configuration**:
-- File: `./release-notes.md`
-- Header: `## Latest Changes`
-- End regex: `^## ` (next level 2 heading)
-- Label header prefix: `### `
-
-**Special Token**:
-- Uses `LATEST_CHANGES` secret (instead of default GITHUB_TOKEN) to trigger subsequent CI
-
-**Debugging Features**:
-- Supports manual trigger with PR number specification
-- Debug logging enabled
-
----
-
-### Add to Project
-
-**File**: `.github/workflows/add-to-project.yml`
-
-**Triggers**:
-- Pull Request created (all types)
-- Issue opened or reopened
-
-**Description**:
-Automatically adds new Issues and Pull Requests to a GitHub Projects board for easier project management.
-
-**Main Steps**:
-1. Use `actions/add-to-project` action
-2. Add to specified project board: `https://github.com/orgs/fastapi/projects/2`
-
-**Permissions Required**:
-- Uses `PROJECTS_TOKEN` secret (requires project management permissions)
 
 ---
 
@@ -433,10 +360,6 @@ Playwright Tests (4 parallel shards) → Merge reports
                                   HTML report
 
 pre-commit → pre-commit-alls-green (branch protection)
-
-Latest Changes ← PR merged
-              ↓
-        Update release-notes.md
 ```
 
 ---
@@ -446,10 +369,10 @@ Latest Changes ← PR merged
 The following GitHub Secrets need to be configured for the project:
 
 ### Deployment Secrets
-- `DOMAIN_STAGING` - Staging environment domain
-- `DOMAIN_PRODUCTION` - Production environment domain
-- `STACK_NAME_STAGING` - Staging Docker Stack name
-- `STACK_NAME_PRODUCTION` - Production Docker Stack name
+- `DOMAIN_STAGING` - Staging environment domain (currently disabled)
+- `DOMAIN_PRODUCTION` - Production environment domain (currently disabled)
+- `STACK_NAME_STAGING` - Staging Docker Stack name (currently disabled)
+- `STACK_NAME_PRODUCTION` - Production Docker Stack name (currently disabled)
 
 ### Application Configuration
 - `SECRET_KEY` - Application secret key
@@ -467,8 +390,6 @@ The following GitHub Secrets need to be configured for the project:
 ### CI/CD Tools
 - `SMOKESHOW_AUTH_KEY` - Smokeshow authentication key
 - `PRE_COMMIT` - Pre-commit token for commits
-- `LATEST_CHANGES` - Latest Changes token for commits
-- `PROJECTS_TOKEN` - GitHub Projects management token
 
 ---
 
@@ -478,9 +399,9 @@ Based on the workflow configuration, the following protection rules are recommen
 
 1. **Required Status Checks**:
    - `pre-commit-alls-green`
-   - `alls-green-playwright`
+   - `playwright-alls-green`
    - `test-backend`
-   - `check-labels`
+   - `validate-pr-title` (PR Labels)
 
 2. **Required Reviews**:
    - At least 1 approval
@@ -498,14 +419,15 @@ Based on the workflow configuration, the following protection rules are recommen
    - Run `bash scripts/test.sh` to ensure local tests pass
 
 2. **Pull Requests**:
-   - Ensure appropriate labels are added (feature/bug/docs, etc.)
+   - Follow Conventional Commits format for PR titles (e.g., `feat: add new feature`)
+   - Labels will be automatically added based on commit type
    - Wait for all CI checks to pass before merging
    - Resolve all merge conflicts
 
 3. **Deployment**:
-   - Staging: Push to `master` to automatically deploy to Staging
-   - Production: Create a Release to automatically deploy to Production
-   - Ensure all required secrets are configured
+   - Staging and Production deployments are currently disabled
+   - To enable: Update the `if: false` condition in deployment workflow files
+   - Ensure all required secrets are configured before enabling
 
 4. **Testing**:
    - Backend test coverage must be ≥ 90%
@@ -524,7 +446,14 @@ Based on the workflow configuration, the following protection rules are recommen
 - Review uploaded test report artifacts
 - Use workflow_dispatch to enable tmate debugging mode
 
+### PR Title Validation Failures
+- Ensure PR title follows Conventional Commits format: `<type>: <description>`
+- Supported types: feat, fix, docs, test, ci, refactor, perf, chore, revert, build, style
+- Examples: `feat: add login`, `fix(api): resolve timeout`, `docs: update README`
+
 ### Deployment Failures
+- Deployments are currently disabled (`if: false` in workflow files)
+- To enable: Remove or modify the `if: false` condition
 - Check if secrets configuration is complete
 - Verify self-hosted runners are online
 - Review Docker Compose logs

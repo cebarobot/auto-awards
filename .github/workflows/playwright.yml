@@ -108,7 +108,7 @@ jobs:
         include-hidden-files: true
 
   # https://github.com/marketplace/actions/alls-green#why
-  alls-green-playwright:  # This job does nothing and is only used for the branch protection
+  playwright-alls-green:  # This job does nothing and is only used for the branch protection
     if: always()
     needs:
       - test-playwright

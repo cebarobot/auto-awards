@@ -1,0 +1,22 @@
+name: PR Labels
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+
+jobs:
+  validate-pr-title:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR Conventional Commit Validation
+        uses: ytanikin/pr-conventional-commits@1.5.1
+        with:
+          task_types: '["feat","fix","docs","test","ci","refactor","perf","chore","revert","build","style"]'
+          custom_labels: '{"feat": "feature", "fix": "bug", "docs": "docs", "test": "test", "ci": "internal", "refactor": "refactor", "perf": "performance", "chore": "internal", "revert": "revert", "build": "internal", "style": "internal"}'
